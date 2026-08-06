@@ -221,9 +221,9 @@ bulan_opts = ['Semua Bulan'] + sorted([int(b) for b in data['BULAN'].dropna().un
 cabang_opts = ['Semua Cabang'] + sorted(data['CABANG'].dropna().unique().tolist())
 
 st.sidebar.title("🔎 Filter")
-f_tahun = st.sidebar.selectbox("Tahun", tahun_opts, format_func=lambda x: x)
+f_tahun = st.sidebar.selectbox("Tahun", tahun_opts, format_func=lambda x: str(x))
 f_bulan = st.sidebar.selectbox("Bulan", bulan_opts, format_func=lambda x: x if isinstance(x, str) else BULAN_NAMES[x])
-f_cabang = st.sidebar.selectbox("Cabang", cabang_opts, format_func=lambda x: x)
+f_cabang = st.sidebar.selectbox("Cabang", cabang_opts, format_func=lambda x: str(x))
 
 st.sidebar.markdown("---")
 st.sidebar.caption(
