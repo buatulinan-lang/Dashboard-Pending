@@ -566,7 +566,7 @@ with tab_pending:
         palette=PALETTE_URGENT,
         banner_html="""
         <div class="warn-banner">
-          ⚠️ <b>Pending bukan pencapaian — ini beban kerja yang harus segera dituntaskan.</b>
+          ⚠️ <b>Pending bukan pencapaian — ini beban kerja yang harus segera dituntaskan dan di selesaikan.</b>
           <span>Semakin lama status tertahan, semakin besar risiko komplain dari customer. Gunakan ranking di bawah
           untuk menentukan prioritas tindak lanjut (teknisi, cabang, dan jenis kerusakan mana yang paling butuh perhatian).</span>
         </div>
