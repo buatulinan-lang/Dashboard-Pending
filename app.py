@@ -14,6 +14,7 @@ hitung ulang. Tidak perlu internet, semua proses jalan di komputer sendiri.
 import calendar
 import io
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
@@ -24,6 +25,12 @@ import streamlit as st
 # Konfigurasi halaman & style
 # ---------------------------------------------------------------------------
 st.set_page_config(page_title="Dashboard Service Cabang", layout="wide", page_icon="📊")
+
+# Data bawaan yang tersimpan permanen di dalam repo (folder data/). Kalau file
+# ini ada, dashboard otomatis memuatnya tanpa perlu upload manual setiap kali
+# app "bangun" lagi setelah tidur (di Streamlit Community Cloud). Untuk update
+# data secara permanen, ganti/timpa file ini di GitHub lalu reboot app.
+DEFAULT_DATA_PATH = Path(__file__).parent / "data" / "latest_data.csv.gz"
 
 BULAN_NAMES = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli',
                'Agustus', 'September', 'Oktober', 'November', 'Desember']
@@ -99,8 +106,8 @@ def jenis_pending(status) -> str:
     return 'Umum'
 
 
-@st.cache_data(show_spinner="Membaca & memproses file Excel (bisa beberapa puluh detik untuk file besar)...")
-def load_data(file_bytes: bytes) -> pd.DataFrame:
+def _read_xlsx_raw(file_bytes: bytes) -> pd.DataFrame:
+    """Baca file Excel (satu sheet per cabang) jadi satu DataFrame + kolom CABANG."""
     xls = pd.ExcelFile(io.BytesIO(file_bytes), engine='openpyxl')
     frames = []
     for sheet in xls.sheet_names:
@@ -111,8 +118,23 @@ def load_data(file_bytes: bytes) -> pd.DataFrame:
         frames.append(df)
     if not frames:
         return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True, sort=False)
 
-    full = pd.concat(frames, ignore_index=True, sort=False)
+
+def _read_csv_gz_raw(file_bytes: bytes) -> pd.DataFrame:
+    """Baca file data bawaan (csv terkompresi gzip) yang kolom CABANG-nya sudah ada."""
+    return pd.read_csv(io.BytesIO(file_bytes), compression='gzip')
+
+
+@st.cache_data(show_spinner="Membaca & memproses data (bisa beberapa puluh detik untuk file besar)...")
+def load_data(file_bytes: bytes, source_kind: str) -> pd.DataFrame:
+    if source_kind == 'csv_gz':
+        full = _read_csv_gz_raw(file_bytes)
+    else:
+        full = _read_xlsx_raw(file_bytes)
+
+    if full.empty:
+        return pd.DataFrame()
 
     missing = [c for c in REQUIRED_COLUMNS if c not in full.columns]
     if missing:
@@ -191,20 +213,29 @@ st.sidebar.title("📁 Sumber Data")
 uploaded = st.sidebar.file_uploader(
     "Upload file Excel (satu sheet per cabang)",
     type=['xlsx'],
-    help="Format sama seperti Gabungan_Semua_Cabang.xlsx. Upload ulang kapan saja ada data baru."
+    help="Opsional. Kalau tidak upload apa pun, dashboard memakai data bawaan yang tersimpan di repo (kalau ada)."
 )
 
-if uploaded is None:
+if uploaded is not None:
+    source_bytes = uploaded.getvalue()
+    source_kind = 'xlsx'
+    st.sidebar.success("📤 Memakai file yang baru diupload (berlaku untuk sesi ini saja).")
+elif DEFAULT_DATA_PATH.exists():
+    source_bytes = DEFAULT_DATA_PATH.read_bytes()
+    source_kind = 'csv_gz'
+    st.sidebar.info("📦 Memakai data bawaan yang tersimpan di repo — tidak perlu upload.")
+else:
     st.title("📊 Dashboard Service Cabang")
     st.info(
         "Silakan upload file Excel data (format: satu sheet per cabang, kolom baku seperti "
         "NOMOR PENGIRIMAN PESANAN, TGL PENGIRIMAN, STATUS PENGERJAAN, NAMA TEKNISI, KERUSAKAN UTAMA, dst) "
-        "lewat panel di sebelah kiri untuk mulai."
+        "lewat panel di sebelah kiri untuk mulai. Atau, tambahkan file `data/latest_data.csv.gz` ke repo "
+        "supaya dashboard punya data bawaan dan tidak perlu upload setiap kali app dibuka ulang."
     )
     st.stop()
 
 try:
-    data = load_data(uploaded.getvalue())
+    data = load_data(source_bytes, source_kind)
 except ValueError as e:
     st.error(str(e))
     st.stop()
